@@ -1,27 +1,60 @@
-// SPDX-License-Identifier: MPL-2.0
-
+using Robust.Client.UserInterface;
 using Robust.Client.UserInterface.Controls;
+using System;
+using System.Numerics;
+using Robust.Client.Graphics;
+using Robust.Shared.Maths;
 
 namespace Content.Client.Lobby.UI.Roles;
 
-/// <summary>
-/// Minimal expand/collapse buttons for trait categories.
-/// </summary>
-public sealed class TraitExpandCollapseButtons : BoxContainer
+public sealed class TraitExpandCollapseButtons : PanelContainer
 {
     public event Action<bool>? OnExpandCollapseAll;
 
     public TraitExpandCollapseButtons()
     {
-        Orientation = LayoutOrientation.Horizontal;
-        HorizontalAlignment = HAlignment.Center;
+        // Create a container for the buttons
+        var container = new BoxContainer
+        {
+            Orientation = BoxContainer.LayoutOrientation.Horizontal,
+            HorizontalExpand = true,
+            SeparationOverride = 0 // No separation between buttons
+        };
 
-        var expandButton = new Button { Text = "Expand All" };
-        expandButton.OnPressed += _ => OnExpandCollapseAll?.Invoke(true);
-        AddChild(expandButton);
+        // Create the expand all button
+        var expandAllButton = new Button
+        {
+            Text = "Expand All",
+            StyleClasses = { "OpenRight" },
+            HorizontalExpand = true,
+            VerticalExpand = true,
+            TextAlign = Label.AlignMode.Center,
+            MinSize = new Vector2(0, 30)
+        };
 
-        var collapseButton = new Button { Text = "Collapse All" };
-        collapseButton.OnPressed += _ => OnExpandCollapseAll?.Invoke(false);
-        AddChild(collapseButton);
+        // Create the collapse all button
+        var collapseAllButton = new Button
+        {
+            Text = "Collapse All",
+            StyleClasses = { "OpenLeft" },
+            HorizontalExpand = true,
+            VerticalExpand = true,
+            TextAlign = Label.AlignMode.Center,
+            MinSize = new Vector2(0, 30)
+        };
+
+        // Add event handlers
+        expandAllButton.OnPressed += _ => OnExpandCollapseAll?.Invoke(true);
+        collapseAllButton.OnPressed += _ => OnExpandCollapseAll?.Invoke(false);
+
+        // Add the buttons to the container
+        container.AddChild(expandAllButton);
+        container.AddChild(collapseAllButton);
+
+        // Add the container to this control
+        AddChild(container);
+
+        // Add some margin at the bottom
+        Margin = new Thickness(0, 0, 0, 5);
     }
 }

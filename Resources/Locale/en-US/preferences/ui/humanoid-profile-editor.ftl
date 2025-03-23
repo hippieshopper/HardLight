@@ -62,6 +62,7 @@ humanoid-profile-editor-flavortext-tab = Description
 # Traits
 humanoid-profile-editor-traits-tab = Traits
 humanoid-profile-editor-no-traits = No traits available
+humanoid-profile-editor-traits-default-category = Uncategorized
 
 humanoid-profile-editor-trait-count-hint = Points Available: [{$current}/{$max}]
 
@@ -71,7 +72,7 @@ humanoid-profile-editor-clear-all-traits-confirm = Confirm Clear
 humanoid-profile-editor-traits-default-category = Uncategorized
 
 trait-category-disabilities = Disabilities
-trait-category-speech = Speech traits
+trait-category-speech = Accents
 trait-category-quirks = Quirks
 # Mono
 trait-category-physical = Physical

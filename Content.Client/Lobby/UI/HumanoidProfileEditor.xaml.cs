@@ -728,7 +728,13 @@ namespace Content.Client.Lobby.UI
             // Create UI view from model
             foreach (var (categoryId, categoryTraits) in traitGroups)
             {
+                // Skip the default category if it has no traits
+                if (categoryId == TraitCategoryPrototype.Default && categoryTraits.Count == 0)
+                    continue;
+
                 TraitCategoryPrototype? category = null;
+                string categoryName;
+                int? maxTraitPoints = null;
                 string categoryName;
                 int? maxTraitPoints = null;
 
@@ -765,6 +771,7 @@ namespace Content.Client.Lobby.UI
                 List<TraitPreferenceSelector?> selectors = new();
                 var selectionCount = 0;
 
+                // First pass: calculate current points and create selectors
                 foreach (var traitProto in categoryTraits)
                 {
                     var trait = _prototypeManager.Index<TraitPrototype>(traitProto);
@@ -836,7 +843,38 @@ namespace Content.Client.Lobby.UI
                             }
 
                             var oldProfile = Profile;
+                            // Calculate current points for this category before adding the new trait
+                            var currentPoints = 0;
+                            if (category != null && category.MaxTraitPoints >= 0)
+                            {
+                                foreach (var existingTraitId in Profile?.TraitPreferences ?? new HashSet<ProtoId<TraitPrototype>>())
+                                {
+                                    if (!_prototypeManager.TryIndex<TraitPrototype>(existingTraitId, out var existingProto))
+                                        continue;
+
+                                    if (existingProto.Category == categoryId)
+                                        currentPoints += existingProto.Cost;
+                                }
+
+                                // Check if adding this trait would exceed the maximum points
+                                if (currentPoints + trait.Cost > category.MaxTraitPoints)
+                                {
+                                    // Reset the selection without triggering the event
+                                    selector.Preference = false;
+                                    return;
+                                }
+                            }
+
+                            var oldProfile = Profile;
                             Profile = Profile?.WithTraitPreference(trait.ID, _prototypeManager);
+
+                            // If the profile didn't change, it means the trait couldn't be added (e.g., due to point limits)
+                            if (Profile == oldProfile)
+                            {
+                                // Reset the selection without triggering the event
+                                selector.Preference = false;
+                                return;
+                            }
 
                             // If the profile didn't change, it means the trait couldn't be added (e.g., due to point limits)
                             if (Profile == oldProfile)
@@ -960,6 +998,7 @@ namespace Content.Client.Lobby.UI
                     });
                 }
 
+                // Second pass: add selectors to UI with appropriate colors
                 foreach (var selector in selectors)
                 {
                     if (selector == null)
