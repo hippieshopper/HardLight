@@ -1,3 +1,40 @@
+// SPDX-FileCopyrightText: 2022 Alex Evgrashin
+// SPDX-FileCopyrightText: 2022 Andreas Kämper
+// SPDX-FileCopyrightText: 2022 EmoGarbage404
+// SPDX-FileCopyrightText: 2022 Fishfish458
+// SPDX-FileCopyrightText: 2022 Flipp Syder
+// SPDX-FileCopyrightText: 2022 Rane
+// SPDX-FileCopyrightText: 2022 Visne
+// SPDX-FileCopyrightText: 2022 fishfish458 <fishfish458>
+// SPDX-FileCopyrightText: 2023 Cheackraze
+// SPDX-FileCopyrightText: 2023 DrSmugleaf
+// SPDX-FileCopyrightText: 2023 Leon Friedrich
+// SPDX-FileCopyrightText: 2023 Nemanja
+// SPDX-FileCopyrightText: 2023 Slava0135
+// SPDX-FileCopyrightText: 2023 Vordenburg
+// SPDX-FileCopyrightText: 2023 deltanedas
+// SPDX-FileCopyrightText: 2023 keronshb
+// SPDX-FileCopyrightText: 2024 Checkraze
+// SPDX-FileCopyrightText: 2024 Dvir
+// SPDX-FileCopyrightText: 2024 Ed
+// SPDX-FileCopyrightText: 2024 GreaseMonk
+// SPDX-FileCopyrightText: 2024 LordCarve
+// SPDX-FileCopyrightText: 2024 Niels Huylebroeck
+// SPDX-FileCopyrightText: 2024 Pieter-Jan Briers
+// SPDX-FileCopyrightText: 2024 Repo
+// SPDX-FileCopyrightText: 2024 Robert V
+// SPDX-FileCopyrightText: 2024 Tayrtahn
+// SPDX-FileCopyrightText: 2024 checkraze
+// SPDX-FileCopyrightText: 2024 goet
+// SPDX-FileCopyrightText: 2024 lzk
+// SPDX-FileCopyrightText: 2024 metalgearsloth
+// SPDX-FileCopyrightText: 2025 Ark
+// SPDX-FileCopyrightText: 2025 ScarKy0
+// SPDX-FileCopyrightText: 2025 Whatstone
+// SPDX-FileCopyrightText: 2025 ark1368
+//
+// SPDX-License-Identifier: MPL-2.0
+
 using System.Linq;
 using Content.Server._NF.Bank;
 using System.Numerics;
@@ -29,7 +66,9 @@ using Content.Shared.Database; // Frontier
 using Content.Shared._NF.Bank.BUI; // Frontier
 using Content.Server._NF.Contraband.Systems; // Frontier
 using Content.Shared.Stacks; // Frontier
-using Content.Server.Stack; // Frontier
+using Content.Server.Stack;
+using Content.Server._Mono.VendingMachine;
+using Content.Shared._Mono.Traits.Physical;
 using Robust.Shared.Containers; // Frontier
 using Content.Shared._NF.Bank.Components; // Frontier
 using Robust.Shared.Configuration; // HL: CVars
@@ -270,6 +309,233 @@ namespace Content.Server.VendingMachines
 
             component.Contraband = contraband;
             Dirty(uid, component);
+        }
+
+        public void Deny(EntityUid uid, VendingMachineComponent? vendComponent = null)
+        {
+            if (!Resolve(uid, ref vendComponent))
+                return;
+
+            if (vendComponent.Denying)
+                return;
+
+            vendComponent.Denying = true;
+            Audio.PlayPvs(vendComponent.SoundDeny, uid, AudioParams.Default.WithVolume(-2f));
+            TryUpdateVisualState(uid, vendComponent);
+        }
+
+        /// <summary>
+        /// Checks if the user is authorized to use this vending machine
+        /// </summary>
+        /// <param name="uid"></param>
+        /// <param name="sender">Entity trying to use the vending machine</param>
+        /// <param name="vendComponent"></param>
+        public bool IsAuthorized(EntityUid uid, EntityUid sender, VendingMachineComponent? vendComponent = null)
+        {
+            if (!Resolve(uid, ref vendComponent))
+                return false;
+
+            if (!TryComp<AccessReaderComponent>(uid, out var accessReader))
+                return true;
+
+            if (_accessReader.IsAllowed(sender, uid, accessReader))
+                return true;
+
+            Popup.PopupEntity(Loc.GetString("vending-machine-component-try-eject-access-denied"), uid);
+            Deny(uid, vendComponent);
+            return false;
+        }
+
+        /// <summary>
+        /// Tries to eject the provided item. Will do nothing if the vending machine is incapable of ejecting, already ejecting
+        /// or the item doesn't exist in its inventory.
+        /// </summary>
+        /// <param name="uid"></param>
+        /// <param name="type">The type of inventory the item is from</param>
+        /// <param name="itemId">The prototype ID of the item</param>
+        /// <param name="throwItem">Whether the item should be thrown in a random direction after ejection</param>
+        /// <param name="vendComponent"></param>
+        public bool TryEjectVendorItem(EntityUid uid, InventoryType type, string itemId, bool throwItem, VendingMachineComponent? vendComponent = null)
+        {
+            if (!Resolve(uid, ref vendComponent))
+                return false;
+
+            if (vendComponent.Ejecting || vendComponent.Broken || !this.IsPowered(uid, EntityManager))
+            {
+                return false;
+            }
+
+            var entry = GetEntry(uid, itemId, type, vendComponent);
+
+            if (entry == null)
+            {
+                Popup.PopupEntity(Loc.GetString("vending-machine-component-try-eject-invalid-item"), uid);
+                Deny(uid, vendComponent);
+                return false;
+            }
+
+            if (entry.Amount <= 0)
+            {
+                Popup.PopupEntity(Loc.GetString("vending-machine-component-try-eject-out-of-stock"), uid);
+                Deny(uid, vendComponent);
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(entry.ID))
+                return false;
+
+            if (!TryComp<TransformComponent>(vendComponent.Owner, out var transformComp))
+                return false;
+
+            // Start Ejecting, and prevent users from ordering while anim playing
+            vendComponent.Ejecting = true;
+            vendComponent.NextItemToEject = entry.ID;
+            vendComponent.ThrowNextItem = throwItem;
+
+            if (TryComp(uid, out SpeakOnUIClosedComponent? speakComponent))
+                _speakOnUIClosed.TrySetFlag((uid, speakComponent));
+
+            // Frontier: unlimited vending
+            // Infinite supplies must stay infinite.
+            if (entry.Amount != uint.MaxValue)
+                entry.Amount--;
+            // End Frontier
+
+            Dirty(uid, vendComponent);
+            TryUpdateVisualState(uid, vendComponent);
+            Audio.PlayPvs(vendComponent.SoundVend, uid);
+            return true;
+        }
+
+        // Frontier: custom vending check
+        /// <summary>
+        /// Checks whether the user is authorized to use the vending machine, then ejects the provided item if true
+        /// </summary>
+        /// <param name="uid"></param>
+        /// <param name="sender">Entity that is trying to use the vending machine</param>
+        /// <param name="type">The type of inventory the item is from</param>
+        /// <param name="itemId">The prototype ID of the item</param>
+        /// <param name="component"></param>
+        public void AuthorizedVend(EntityUid uid, EntityUid sender, InventoryType type, string itemId, VendingMachineComponent component)
+        {
+            if (!_prototypeManager.TryIndex<EntityPrototype>(itemId, out var proto))
+                return;
+
+            var price = _pricing.GetEstimatedPrice(proto);
+            // Somewhere deep in the code of pricing, a hardcoded 20 dollar value exists for anything without
+            // a staticprice component for some god forsaken reason, and I cant find it or think of another way to
+            // get an accurate price from a prototype with no staticprice comp.
+            // this will undoubtably lead to vending machine exploits if I cant find wtf pricing system is doing.
+            // also stacks, food, solutions, are handled poorly too f
+            if (price == 0)
+                price = 20;
+
+            if (TryComp<MarketModifierComponent>(component.Owner, out var modifier))
+                price *= modifier.Mod;
+
+            var totalPrice = (int) price;
+
+            // If any price has a vendor price, explicitly use its value - higher OR lower, over others.
+            var priceVend = _pricing.GetEstimatedVendPrice(proto);
+            if (priceVend > 0.0) // if vending price exists, overwrite it.
+                totalPrice = (int) priceVend;
+
+            if (IsAuthorized(uid, sender, component))
+            {
+                int bankBalance = 0;
+                if (!HasComp<IronmanComponent>(sender) && TryComp<BankAccountComponent>(sender, out var bank))
+                    bankBalance = bank.Balance;
+
+                int cashSlotBalance = 0;
+                Entity<StackComponent>? cashEntity = null;
+                if (component.CashSlotName != null
+                    && component.CurrencyStackType != null
+                    && ItemSlots.TryGetSlot(uid, component.CashSlotName, out var cashSlot)
+                    && TryComp<StackComponent>(cashSlot?.ContainerSlot?.ContainedEntity, out var stackComp)
+                    && stackComp!.StackTypeId == component.CurrencyStackType)
+                {
+                    cashSlotBalance = stackComp!.Count;
+                    cashEntity = (cashSlot!.ContainerSlot!.ContainedEntity.Value, stackComp!);
+                }
+
+                if (totalPrice > bankBalance + cashSlotBalance)
+                {
+                    _popupSystem.PopupEntity(Loc.GetString("bank-insufficient-funds"), uid);
+                    Deny(uid, component);
+                    return;
+                }
+
+                bool paidFully = false;
+                // Mono: Store the purchase price for tracking
+                component.LastPurchasePrice = totalPrice;
+
+                if (TryEjectVendorItem(uid, type, itemId, component.CanShoot, component))
+                {
+                    if (cashEntity != null)
+                    {
+                        var newCashSlotBalance = Math.Max(cashSlotBalance - totalPrice, 0);
+                        _stack.SetCount(cashEntity.Value.Owner, newCashSlotBalance, cashEntity.Value.Comp);
+                        component.CashSlotBalance = newCashSlotBalance;
+                        paidFully = true; // Either we paid fully with cash, or we need to withdraw the remainder
+                    }
+                    if (totalPrice > cashSlotBalance && !HasComp<Content.Shared._Mono.Traits.Physical.IronmanComponent>(sender))
+                        paidFully = _bankSystem.TryBankWithdraw(sender, totalPrice - cashSlotBalance);
+
+                    // If we paid completely, pay our station taxes
+                    if (paidFully)
+                    {
+                        foreach (var (account, taxCoeff) in component.TaxAccounts)
+                        {
+                            if (!float.IsFinite(taxCoeff) || taxCoeff <= 0.0f)
+                                continue;
+                            var tax = (int)Math.Floor(totalPrice * taxCoeff);
+                            _bankSystem.TrySectorDeposit(account, tax, LedgerEntryType.VendorTax);
+                        }
+                    }
+
+                    // Something was ejected, update the vending component's state
+                    Dirty(uid, component);
+
+                    _adminLogger.Add(LogType.Action, LogImpact.Low,
+                        $"{ToPrettyString(sender):user} bought from [vendingMachine:{ToPrettyString(uid!)}, product:{proto.Name}, cost:{totalPrice},  with ${cashSlotBalance} in the cash slot and ${bankBalance} in the bank.");
+                }
+            }
+            // End Frontier
+        }
+
+        /// <summary>
+        /// Tries to update the visuals of the component based on its current state.
+        /// </summary>
+        public void TryUpdateVisualState(EntityUid uid, VendingMachineComponent? vendComponent = null)
+        {
+            if (!Resolve(uid, ref vendComponent))
+                return;
+
+            var finalState = VendingMachineVisualState.Normal;
+            if (vendComponent.Broken)
+            {
+                finalState = VendingMachineVisualState.Broken;
+            }
+            else if (vendComponent.Ejecting)
+            {
+                finalState = VendingMachineVisualState.Eject;
+            }
+            else if (vendComponent.Denying)
+            {
+                finalState = VendingMachineVisualState.Deny;
+            }
+            else if (!this.IsPowered(uid, EntityManager))
+            {
+                finalState = VendingMachineVisualState.Off;
+            }
+
+            if (_light.TryGetLight(uid, out var pointlight))
+            {
+                var lightState = finalState != VendingMachineVisualState.Broken && finalState != VendingMachineVisualState.Off;
+                _light.SetEnabled(uid, lightState, pointlight);
+            }
+
+            _appearanceSystem.SetData(uid, VendingMachineVisuals.VisualState, finalState);
         }
 
         /// <summary>

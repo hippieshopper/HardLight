@@ -132,6 +132,14 @@
   - type: ContainerContainer
     containers:
       toggleable-clothing: !type:ContainerSlot {}
+      storagebase: !type:Container
+        ents: []
+  - type: UserInterface
+    interfaces:
+      enum.StorageUiKey.Key:
+        type: StorageBoundUserInterface
+      enum.ToggleClothingUiKey.Key:
+        type: ToggleableClothingBoundUserInterface
   - type: GroupExamine
   - type: Tag
     tags:
