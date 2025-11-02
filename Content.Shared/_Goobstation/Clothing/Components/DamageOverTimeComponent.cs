@@ -17,7 +17,7 @@ public sealed partial class DamageOverTimeComponent : Component
     [DataField(required: true)]
     public DamageSpecifier Damage { get; set; } = new();
 
-    [DataField, customTypeSerializer: typeof(TimespanSerializer)]
+    [DataField(customTypeSerializer: typeof(TimespanSerializer))]
     public TimeSpan Interval = TimeSpan.FromSeconds(1);
 
     [DataField]
