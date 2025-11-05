@@ -6,6 +6,7 @@ using Content.Shared.Damage.Components;
 using Content.Shared.FixedPoint;
 using Content.Shared.Speech;
 using Robust.Shared.Random;
+using Content.Shared.Damage;
 
 namespace Content.Server.Speech.EntitySystems;
 
