@@ -123,7 +123,7 @@
     - id: NFWeaponEnergyPistolDisabler
     - id: TrackingImplanter
     - id: TrackingImplanter
-    - id: ClothingOuterHardsuitBrigmedic
+#    - id: ClothingOuterHardsuitBrigmedic # HL: Moved to HLFillHardsuitBrigmedic
     - id: BoxSterileMask
     - id: ClothingHeadHatBeretBrigmedic
     - id: ClothingOuterCoatAMG

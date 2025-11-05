@@ -73,9 +73,32 @@
 - type: entity
   parent: HLLockerParamedic
   id: HLLockerParamedicFilled
+  suffix: Filled, Hardsuit
+  components:
+  - type: EntityTableContainerFill
+    containers:
+      entity_storage: !type:AllSelector
+        children:
+        - !type:NestedSelector
+          tableId: LockerFillParamedic
+        - !type:NestedSelector
+          tableId: HLFillParamedicHardsuit
+
+- type: entity
+  parent: HLLockerParamedic
+  id: HLLockerParamedicFilledNoHardsuit
   suffix: Filled
   components:
   - type: EntityTableContainerFill
     containers:
       entity_storage: !type:NestedSelector
         tableId: LockerFillParamedic
+
+- type: entityTable
+  id: HLFillParamedicHardsuit
+  table: !type:AllSelector
+    children:
+    - id: ClothingOuterHardsuitVoidParamed
+    - id: NFTankO2N2EqualFilled
+    - id: ClothingMaskBreathMedical
+    - id: JetpackMiniFilled
