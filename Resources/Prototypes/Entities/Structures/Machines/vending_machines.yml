@@ -2251,7 +2251,7 @@
   description: A vending machine for naughty toys.
   components:
   - type: VendingMachine
-    pack: passionDrobe
+    pack: passionDrobeInventory
     offState: off
     brokenState: broken
     normalState: normal-unshaded
