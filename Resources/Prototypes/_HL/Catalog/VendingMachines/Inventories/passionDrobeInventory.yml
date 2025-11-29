@@ -1,5 +1,5 @@
 - type: vendingMachineInventory
-  id: passionDrobe
+  id: passionDrobeInventory
   startingInventory:
     AvianDildo: 4
 	CanineDildo: 4
