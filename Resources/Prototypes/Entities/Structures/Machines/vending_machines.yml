@@ -2259,7 +2259,7 @@
   - type: SpeakOnUIClosed
     pack: GenericVendGoodbyes
   - type: Sprite
-    sprite: Structures/Machines/VendingMachines/passiondrobe.rsi
+    sprite: _HL/Structures/Machines/VendingMachines/passiondrobe.rsi
     layers:
     - state: "off"
       map: ["enum.VendingMachineVisualLayers.Base"]
